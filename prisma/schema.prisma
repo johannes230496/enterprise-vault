@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------
+// NextAuth Standard Models
+// ----------------------------------------
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String  @map("user_id")
+  type               String
+  provider           String
+  providerAccountId  String  @map("provider_account_id")
+  refresh_token      String? 
+  access_token       String? 
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String? 
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// ----------------------------------------
+// Enterprise Vault Domain Models
+// ----------------------------------------
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users   User[]
+  groups  Group[]
+  vaults  Vault[]
+
+  @@map("organizations")
+}
+
+// Roles handled as strings for SQLite compatibility
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  passwordHash  String?   @map("password_hash") // For prototype demo without SSO
+  
+  organizationId String?  @map("organization_id")
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  globalRole     String @default("MEMBER") @map("global_role")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  accounts          Account[]
+  sessions          Session[]
+  groupMemberships  GroupMembership[]
+  vaultMemberships  VaultMembership[]
+  secretsAuthored   Secret[]          @relation("SecretAuthor")
+  secretVersions    SecretVersion[]   @relation("SecretVersionAuthor")
+  auditEvents       AuditEvent[]
+  temporaryGrants   TemporaryAccessGrant[]
+  personalVaults    Vault[]           @relation("PersonalVaults")
+
+  @@map("users")
+}
+
+model Group {
+  id             String       @id @default(cuid())
+  name           String
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  members          GroupMembership[]
+  vaultMemberships VaultMembership[]
+
+  @@map("groups")
+}
+
+model GroupMembership {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  groupId   String   @map("group_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@map("group_memberships")
+}
+
+model Vault {
+  id             String       @id @default(cuid())
+  name           String
+  description    String?
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  isPersonal     Boolean      @default(false) @map("is_personal")
+  userId         String?      @map("user_id") // Optional owner for personal vaults
+  user           User?        @relation("PersonalVaults", fields: [userId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  secrets     Secret[]
+  memberships VaultMembership[]
+
+  @@map("vaults")
+}
+
+// Determines exactly what a user or group can do inside a vault
+model VaultMembership {
+  id        String   @id @default(cuid())
+  vaultId   String   @map("vault_id")
+  userId    String?  @map("user_id")   // If direct assignment (exceptional)
+  groupId   String?  @map("group_id")  // If group assignment (preferred)
+  
+  // Permissions defined as JSON string to allow fine-grained access
+  // e.g. '{ "use": true, "reveal": false, "edit": false, "manage": false, "export": false }'
+  permissions String
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  vault Vault  @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  user  User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  // Ensure it's either user OR group, enforced in application logic
+  @@map("vault_memberships")
+}
+
+model Secret {
+  id           String  @id @default(cuid())
+  vaultId      String  @map("vault_id")
+  name         String
+  description  String?
+  contentType  String  @default("LOGIN") // LOGIN, API_KEY, DB, NOTE
+  
+  // Prototype encryption fields
+  encryptedData String
+  iv            String
+  authTag       String
+
+  createdById  String  @map("created_by_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  vault    Vault           @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  author   User            @relation("SecretAuthor", fields: [createdById], references: [id])
+  versions SecretVersion[]
+
+  @@map("secrets")
+}
+
+model SecretVersion {
+  id            String   @id @default(cuid())
+  secretId      String   @map("secret_id")
+  
+  encryptedData String
+  iv            String
+  authTag       String
+
+  createdById   String   @map("created_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  secret Secret @relation(fields: [secretId], references: [id], onDelete: Cascade)
+  author User   @relation("SecretVersionAuthor", fields: [createdById], references: [id])
+
+  @@map("secret_versions")
+}
+
+model TemporaryAccessGrant {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  
+  // Defines what this grant gives access to
+  targetType  String   // "VAULT" or "SECRET"
+  targetId    String   @map("target_id")
+  permissions String   // Granted capabilities (JSON string)
+
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("temporary_access_grants")
+}
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  actorId     String?  @map("actor_id") // Null if system
+  action      String   // e.g. "SECRET_REVEAL", "VAULT_CREATE"
+  targetType  String   // "SECRET", "VAULT", "USER", "GROUP", "ORG"
+  targetId    String   @map("target_id")
+  
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  metadata    String?  // Any context: '{"reason": "Support ticket #102"}'
+  
+  timestamp   DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([targetId, targetType])
+  @@index([actorId])
+  @@map("audit_events")
+}
