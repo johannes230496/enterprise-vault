@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import * as argon2 from 'argon2'
 import crypto from 'crypto'
 
-const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL })
+const prisma = new PrismaClient()
 
 // Dummy encryption for seed secrets
 const DEMO_MASTER_KEY = process.env.NEXTAUTH_SECRET || "fL6Yd7e9jE6fR8tG0qS1zM3vA2bC5dE4h"
