@@ -1,5 +1,5 @@
-# Base image
 FROM node:20-alpine AS base
+RUN apk add --no-cache openssl
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -36,6 +36,7 @@ WORKDIR /app
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV DATABASE_URL="file:/app/prisma/dev.db"
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
