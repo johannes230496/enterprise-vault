@@ -64,4 +64,4 @@ ENV HOSTNAME "0.0.0.0"
 
 # Note: sqlite db needs to be in a persistent volume
 # The command below ensures migrations are run on startup
-CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
+CMD ["sh", "-c", "npx prisma@5.22.0 migrate deploy && node server.js"]
