@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import * as argon2 from "argon2";
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
       name: "Credentials",
