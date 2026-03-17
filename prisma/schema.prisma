@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -57,8 +57,6 @@ model Organization {
 
   @@map("organizations")
 }
-
-// Roles handled as strings for SQLite compatibility
 
 model User {
   id            String    @id @default(cuid())
