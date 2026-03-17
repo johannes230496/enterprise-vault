@@ -31,7 +31,8 @@ export default async function ManageGroupPage({ params }: { params: Promise<{ id
     }
   });
 
-  if (!group) notFound();
+  // Sicherstellen, dass die Gruppe zur eigenen Organisation gehört
+  if (!group || group.organizationId !== user?.organizationId) notFound();
 
   // Alle Benutzer der Organisation holen, die nicht in der Gruppe sind
   const allOrgUsers = await prisma.user.findMany({

@@ -31,6 +31,7 @@ export default async function GruppenSeite() {
   let alleGruppen: any[] = [];
   if (isGlobalAdmin) {
     alleGruppen = await prisma.group.findMany({
+      where: { organizationId: user?.organizationId as string },
       include: {
         vaultMemberships: { include: { vault: true } },
         _count: { select: { members: true } }
