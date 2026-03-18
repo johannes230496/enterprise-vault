@@ -56,12 +56,16 @@ export async function updateGroup(groupId: string, name: string) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { globalRole: true }
+    select: { globalRole: true, organizationId: true }
   });
 
   if (!user || (user.globalRole !== "OWNER" && user.globalRole !== "SECURITY_ADMIN")) {
     throw new Error("Nicht autorisiert");
   }
+
+  // Sicherstellen, dass die Gruppe zur eigenen Organisation gehört
+  const existing = await prisma.group.findUnique({ where: { id: groupId }, select: { organizationId: true } });
+  if (!existing || existing.organizationId !== user.organizationId) throw new Error("Gruppe nicht gefunden");
 
   const group = await prisma.group.update({
     where: { id: groupId },
@@ -80,12 +84,16 @@ export async function deleteGroup(groupId: string) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { globalRole: true }
+    select: { globalRole: true, organizationId: true }
   });
 
   if (!user || user.globalRole !== "OWNER") {
     throw new Error("Nur Besitzer können Gruppen löschen");
   }
+
+  // Sicherstellen, dass die Gruppe zur eigenen Organisation gehört
+  const existing = await prisma.group.findUnique({ where: { id: groupId }, select: { organizationId: true } });
+  if (!existing || existing.organizationId !== user.organizationId) throw new Error("Gruppe nicht gefunden");
 
   await prisma.group.delete({ where: { id: groupId } });
   await auditLog(session.user.id, "GROUP_MANAGE", "GROUP", groupId, { action: "DELETE" });
@@ -99,12 +107,20 @@ export async function addGroupMember(groupId: string, userId: string) {
 
   const admin = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { globalRole: true }
+    select: { globalRole: true, organizationId: true }
   });
 
   if (!admin || (admin.globalRole !== "OWNER" && admin.globalRole !== "SECURITY_ADMIN")) {
     throw new Error("Nicht autorisiert");
   }
+
+  // Gruppe und Ziel-User müssen zur selben Organisation gehören
+  const [group, targetUser] = await Promise.all([
+    prisma.group.findUnique({ where: { id: groupId }, select: { organizationId: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { organizationId: true } }),
+  ]);
+  if (!group || group.organizationId !== admin.organizationId) throw new Error("Gruppe nicht gefunden");
+  if (!targetUser || targetUser.organizationId !== admin.organizationId) throw new Error("Benutzer nicht gefunden");
 
   const membership = await prisma.groupMembership.create({
     data: { groupId, userId }
@@ -121,12 +137,16 @@ export async function removeGroupMember(groupId: string, userId: string) {
 
   const admin = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { globalRole: true }
+    select: { globalRole: true, organizationId: true }
   });
 
   if (!admin || (admin.globalRole !== "OWNER" && admin.globalRole !== "SECURITY_ADMIN")) {
     throw new Error("Nicht autorisiert");
   }
+
+  // Gruppe muss zur eigenen Organisation gehören
+  const group = await prisma.group.findUnique({ where: { id: groupId }, select: { organizationId: true } });
+  if (!group || group.organizationId !== admin.organizationId) throw new Error("Gruppe nicht gefunden");
 
   await prisma.groupMembership.delete({
     where: { userId_groupId: { userId, groupId } }

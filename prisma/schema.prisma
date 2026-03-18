@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -57,8 +57,6 @@ model Organization {
 
   @@map("organizations")
 }
-
-// Roles handled as strings for SQLite compatibility
 
 model User {
   id            String    @id @default(cuid())
@@ -214,6 +212,21 @@ model TemporaryAccessGrant {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("temporary_access_grants")
+}
+
+model Invitation {
+  id             String    @id @default(cuid())
+  token          String    @unique
+  email          String
+  name           String
+  role           String    @default("MEMBER")
+  organizationId String    @map("organization_id")
+  invitedById    String    @map("invited_by_id")
+  expiresAt      DateTime  @map("expires_at")
+  usedAt         DateTime? @map("used_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@map("invitations")
 }
 
 model AuditEvent {

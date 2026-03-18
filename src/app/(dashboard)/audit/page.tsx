@@ -29,7 +29,8 @@ export default async function AuditProtokollSeite({
   
   const ereignisse = await prisma.auditEvent.findMany({
     where: {
-      targetType: zielartFilter
+      targetType: zielartFilter || undefined,
+      actor: { organizationId: user?.organizationId as string },
     },
     orderBy: { timestamp: 'desc' },
     take: 50,

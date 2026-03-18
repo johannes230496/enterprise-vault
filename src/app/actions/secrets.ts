@@ -3,6 +3,7 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { auditLog, canAccessSecret, canManageVault, getEffectivePermissions } from "@/lib/authz";
+import { encryptString, decryptString } from "@/lib/encryption";
 import { revalidatePath } from "next/cache";
 
 export async function revealSecretAction(secretId: string) {
@@ -35,28 +36,32 @@ export async function revealSecretAction(secretId: string) {
     { status: "GRANTED" }
   );
 
-  return {
+  if (!secret.authTag || secret.authTag === "N/A") {
+    throw new Error("Dieses Secret wurde mit einer alten Verschlüsselung gespeichert und kann nicht mehr entschlüsselt werden. Bitte neu anlegen.");
+  }
+
+  const plaintext = decryptString({
     encryptedData: secret.encryptedData,
     iv: secret.iv,
-    authTag: secret.authTag
-  };
+    authTag: secret.authTag,
+  });
+
+  return { plaintext };
 }
 
 export async function createSecretAction(
-  vaultId: string, 
-  name: string, 
-  contentType: string, 
-  encryptedData: string, 
-  iv: string, 
-  authTag: string
+  vaultId: string,
+  name: string,
+  contentType: string,
+  plaintext: string,
 ) {
   const session = await getSession();
   if (!session?.user?.id) throw new Error("Nicht authentifiziert");
 
-  const canEdit = await canAccessSecret(session.user.id as string, "", "edit"); // Check general edit permission or vault-specific
-  // More robust check:
   const perms = await getEffectivePermissions(session.user.id as string, vaultId);
   if (!perms.edit) throw new Error("Keine Berechtigung zum Erstellen von Geheimnissen in diesem Tresor.");
+
+  const { encryptedData, iv, authTag } = encryptString(plaintext);
 
   const secret = await prisma.secret.create({
     data: {
@@ -73,6 +78,32 @@ export async function createSecretAction(
   await auditLog(session.user.id, "SECRET_CREATE", "SECRET", secret.id, { name });
   revalidatePath(`/vaults/${vaultId}`);
   return secret;
+}
+
+export async function updateSecretAction(
+  secretId: string,
+  name: string,
+  contentType: string,
+  plaintext: string,
+) {
+  const session = await getSession();
+  if (!session?.user?.id) throw new Error("Nicht authentifiziert");
+
+  const secret = await prisma.secret.findUnique({ where: { id: secretId } });
+  if (!secret) throw new Error("Secret nicht gefunden.");
+
+  const perms = await getEffectivePermissions(session.user.id as string, secret.vaultId);
+  if (!perms.edit) throw new Error("Keine Berechtigung zum Bearbeiten dieses Geheimnisses.");
+
+  const { encryptedData, iv, authTag } = encryptString(plaintext);
+
+  await prisma.secret.update({
+    where: { id: secretId },
+    data: { name, contentType, encryptedData, iv, authTag },
+  });
+
+  await auditLog(session.user.id, "SECRET_UPDATE", "SECRET", secretId, { name });
+  revalidatePath(`/vaults/${secret.vaultId}`);
 }
 
 export async function getVaultMembershipsAction(vaultId: string) {

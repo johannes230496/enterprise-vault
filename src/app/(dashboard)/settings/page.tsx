@@ -1,8 +1,11 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { Settings, Users, Shield, Building2, Trash2, UserPlus } from "lucide-react";
+import { Settings, Users, Shield, Building2, Mail, Clock } from "lucide-react";
 import { format } from "date-fns";
+import BenutzerEinladenModal from "@/components/settings/BenutzerEinladenModal";
+import BenutzerLoeschenButton from "@/components/settings/BenutzerLoeschenButton";
+import EinladungAktionen from "@/components/settings/EinladungAktionen";
 import { de } from "date-fns/locale";
 
 export default async function EinstellungenSeite() {
@@ -28,6 +31,15 @@ export default async function EinstellungenSeite() {
       }
     },
     orderBy: { createdAt: "asc" }
+  });
+
+  const offeneEinladungen = await prisma.invitation.findMany({
+    where: {
+      organizationId: user.organizationId as string,
+      usedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
   });
 
   const rollenBeschriftungen: Record<string, { label: string; color: string }> = {
@@ -86,10 +98,7 @@ export default async function EinstellungenSeite() {
             <Users className="w-5 h-5 text-gray-500 mr-2" />
             <h2 className="font-semibold text-gray-900">Benutzerverwaltung</h2>
           </div>
-          <button className="flex items-center bg-indigo-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-indigo-700">
-            <UserPlus className="w-4 h-4 mr-1.5" />
-            Benutzer einladen
-          </button>
+          <BenutzerEinladenModal />
         </div>
 
         <div className="overflow-x-auto">
@@ -144,14 +153,8 @@ export default async function EinstellungenSeite() {
                       {format(u.createdAt, "dd.MM.yy", { locale: de })}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {!istIchSelbst && (
-                        <button
-                          className="text-gray-400 hover:text-red-600 transition-colors"
-                          title="Benutzer entfernen"
-                          disabled
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      {!istIchSelbst && u.globalRole !== "OWNER" && (
+                        <BenutzerLoeschenButton userId={u.id} name={u.name ?? u.email ?? "?"} />
                       )}
                     </td>
                   </tr>
@@ -160,6 +163,60 @@ export default async function EinstellungenSeite() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      {/* Offene Einladungen */}
+      <section className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center">
+          <Mail className="w-5 h-5 text-gray-500 mr-2" />
+          <h2 className="font-semibold text-gray-900">Offene Einladungen</h2>
+          <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">
+            {offeneEinladungen.length}
+          </span>
+        </div>
+        {offeneEinladungen.length === 0 ? (
+          <div className="px-6 py-8 text-center text-sm text-gray-400">Keine offenen Einladungen</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name / E-Mail</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rolle</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Läuft ab</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {offeneEinladungen.map((inv: any) => {
+                  const rolle = rollenBeschriftungen[inv.role] ?? { label: inv.role, color: "bg-gray-100 text-gray-700" };
+                  return (
+                    <tr key={inv.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium text-gray-900">{inv.name}</p>
+                        <p className="text-xs text-gray-500">{inv.email}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${rolle.color}`}>
+                          {rolle.label}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-xs text-gray-500">
+                          <Clock className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
+                          {format(inv.expiresAt, "dd.MM.yy HH:mm", { locale: de })}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <EinladungAktionen invitationId={inv.id} token={inv.token} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {/* Sicherheitsrichtlinie */}

@@ -26,6 +26,7 @@ export default async function VaultsPage() {
   let allVisibleVaults;
   if (isGlobalAdmin) {
     allVisibleVaults = await prisma.vault.findMany({
+      where: { organizationId: user.organizationId as string },
       include: { _count: { select: { secrets: true } } }
     });
   } else {
