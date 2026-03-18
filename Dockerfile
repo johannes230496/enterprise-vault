@@ -24,7 +24,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Dummy URL so prisma generate works at build time (no real DB connection needed)
 ENV DATABASE_URL="postgresql://user:password@localhost:5432/db"
 
-RUN npx prisma generate
+RUN ./node_modules/.bin/prisma generate
 RUN npm run build
 
 # Production image
@@ -54,4 +54,4 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Run migrations then start the app
-CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node server.js"]
