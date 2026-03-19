@@ -248,3 +248,16 @@ model AuditEvent {
   @@index([actorId])
   @@map("audit_events")
 }
+
+model OrgSettings {
+  id             String  @id @default(cuid())
+  organizationId String  @unique @map("organization_id")
+  enforce2FA     Boolean @default(false) @map("enforce_2fa")
+  preventExport  Boolean @default(true)  @map("prevent_export")
+  auditAll       Boolean @default(true)  @map("audit_all")
+  sessionTimeout Int     @default(8)     @map("session_timeout")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt      @map("updated_at")
+
+  @@map("org_settings")
+}
