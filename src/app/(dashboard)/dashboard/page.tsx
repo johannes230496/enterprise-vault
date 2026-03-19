@@ -16,17 +16,26 @@ export default async function DashboardHome() {
   const gruppenAnzahl = user?.groupMemberships.length || 0;
   
   const gruppenIds = user?.groupMemberships.map(g => g.groupId) || [];
-  const tresorZugriff = await prisma.vaultMembership.findMany({
-    where: {
-      OR: [
-        { userId: session?.user?.id },
-        { groupId: { in: gruppenIds } }
-      ]
-    },
-    include: { vault: true }
-  });
 
-  const eindeutigeTresore = Array.from(new Set(tresorZugriff.map(v => v.vault.id)));
+  let eindeutigeTresore: string[];
+  if (user?.globalRole === "OWNER" || user?.globalRole === "SECURITY_ADMIN") {
+    const alleTresore = await prisma.vault.findMany({
+      where: { organizationId: user.organizationId as string },
+      select: { id: true }
+    });
+    eindeutigeTresore = alleTresore.map(v => v.id);
+  } else {
+    const tresorZugriff = await prisma.vaultMembership.findMany({
+      where: {
+        OR: [
+          { userId: session?.user?.id },
+          { groupId: { in: gruppenIds } }
+        ]
+      },
+      include: { vault: true }
+    });
+    eindeutigeTresore = Array.from(new Set(tresorZugriff.map(v => v.vault.id)));
+  }
 
   let gesamtbenutzer = 0;
   if (user?.globalRole === "OWNER" || user?.globalRole === "SECURITY_ADMIN") {

@@ -155,3 +155,42 @@ export async function removeGroupMember(groupId: string, userId: string) {
   await auditLog(session.user.id, "GROUP_MANAGE", "GROUP", groupId, { action: "REMOVE_MEMBER", memberId: userId });
   revalidatePath(`/groups/${groupId}`);
 }
+
+export async function gruppeVaultZuweisenAction(groupId: string, vaultId: string, permissions: string) {
+  const session = await getSession();
+  if (!session?.user?.id) return { error: "Nicht authentifiziert" };
+
+  const actor = await prisma.user.findUnique({ where: { id: session.user.id as string } });
+  if (!actor || !["OWNER", "SECURITY_ADMIN"].includes(actor.globalRole)) {
+    return { error: "Keine Berechtigung" };
+  }
+
+  // Verify vault belongs to same org
+  const vault = await prisma.vault.findUnique({ where: { id: vaultId } });
+  if (!vault || vault.organizationId !== actor.organizationId) return { error: "Tresor nicht gefunden" };
+
+  // Check not already assigned
+  const existing = await prisma.vaultMembership.findFirst({ where: { groupId, vaultId } });
+  if (existing) return { error: "Gruppe hat bereits Zugriff auf diesen Tresor" };
+
+  await prisma.vaultMembership.create({
+    data: { vaultId, groupId, permissions },
+  });
+
+  revalidatePath(`/groups/${groupId}`);
+  return { success: true };
+}
+
+export async function gruppeVaultEntfernenAction(membershipId: string, groupId: string) {
+  const session = await getSession();
+  if (!session?.user?.id) return { error: "Nicht authentifiziert" };
+
+  const actor = await prisma.user.findUnique({ where: { id: session.user.id as string } });
+  if (!actor || !["OWNER", "SECURITY_ADMIN"].includes(actor.globalRole)) {
+    return { error: "Keine Berechtigung" };
+  }
+
+  await prisma.vaultMembership.delete({ where: { id: membershipId } });
+  revalidatePath(`/groups/${groupId}`);
+  return { success: true };
+}

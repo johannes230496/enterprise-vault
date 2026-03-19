@@ -43,18 +43,18 @@ export default async function VaultDetailPage({ params }: { params: Promise<{ id
   return (
     <div className="max-w-5xl mx-auto space-y-8">
       
-      <div className="flex justify-between items-start border-b border-gray-200 pb-6">
-        <div>
+      <div className="flex flex-wrap gap-4 items-start justify-between border-b border-gray-200 pb-6">
+        <div className="min-w-0">
           <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-            <Shield className="w-8 h-8 text-indigo-600 mr-3" />
-            {vault.name}
+            <Shield className="w-8 h-8 text-indigo-600 mr-3 flex-shrink-0" />
+            <span className="break-words">{vault.name}</span>
           </h1>
           <p className="text-gray-500 mt-2">{vault.description}</p>
         </div>
-        
-        <div className="flex space-x-3">
+
+        <div className="flex flex-wrap gap-2 flex-shrink-0">
           {berechtigungen.manage && (
-            <Link href={`/vaults/${vault.id}/members`} className="flex items-center bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
+            <Link href={`/vaults/${vault.id}/members`} className="flex items-center bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 whitespace-nowrap">
               <UsersIcon className="w-4 h-4 mr-2" />
               Zugriff verwalten
             </Link>

@@ -48,11 +48,30 @@ export default async function ManageGroupPage({ params }: { params: Promise<{ id
     }
   });
 
+  // Existing vault memberships for this group
+  const gruppenVaultMitgliedschaften = await prisma.vaultMembership.findMany({
+    where: { groupId: group.id },
+    include: { vault: true },
+  });
+
+  // All org vaults not yet assigned to this group
+  const alleOrgVaults = await prisma.vault.findMany({
+    where: {
+      organizationId: group.organizationId,
+      isPersonal: false,
+    },
+  });
+  const zuweisbareVaults = alleOrgVaults.filter(
+    v => !gruppenVaultMitgliedschaften.some(m => m.vaultId === v.id)
+  );
+
   return (
-    <GroupManagementClient 
-      group={group} 
+    <GroupManagementClient
+      group={group}
       availableUsers={allOrgUsers}
       isOwner={user?.globalRole === "OWNER"}
+      gruppenVaultMitgliedschaften={gruppenVaultMitgliedschaften}
+      zuweisbareVaults={zuweisbareVaults}
     />
   );
 }

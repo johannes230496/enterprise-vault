@@ -1,19 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { updateGroup, deleteGroup, addGroupMember, removeGroupMember } from "@/app/actions/groups";
+import { updateGroup, deleteGroup, addGroupMember, removeGroupMember, gruppeVaultZuweisenAction, gruppeVaultEntfernenAction } from "@/app/actions/groups";
 import { Users, Trash2, UserPlus, UserMinus, Save, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-export default function GroupManagementClient({ 
-  group, 
+export default function GroupManagementClient({
+  group,
   availableUsers,
-  isOwner 
-}: { 
-  group: any, 
+  isOwner,
+  gruppenVaultMitgliedschaften,
+  zuweisbareVaults,
+}: {
+  group: any,
   availableUsers: any[],
-  isOwner: boolean 
+  isOwner: boolean,
+  gruppenVaultMitgliedschaften: any[],
+  zuweisbareVaults: any[],
 }) {
   const router = useRouter();
   const [name, setName] = useState(group.name);
@@ -192,6 +196,61 @@ export default function GroupManagementClient({
               </div>
             </div>
           </section>
+
+          {/* Tresore verwalten */}
+          <div className="mt-8">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Tresore verwalten</h3>
+
+            {/* Existing vault memberships */}
+            <div className="mb-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Zugewiesene Tresore ({gruppenVaultMitgliedschaften.length})</p>
+              {gruppenVaultMitgliedschaften.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">Keine Tresore zugewiesen.</p>
+              ) : (
+                <div className="space-y-2">
+                  {gruppenVaultMitgliedschaften.map((m: any) => (
+                    <div key={m.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                      <span className="text-sm text-gray-800">{m.vault.name}</span>
+                      <button
+                        onClick={async () => {
+                          await gruppeVaultEntfernenAction(m.id, group.id);
+                          router.refresh();
+                        }}
+                        className="text-gray-400 hover:text-red-600 transition-colors"
+                        title="Zugriff entziehen"
+                      >
+                        <UserMinus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add vault */}
+            {zuweisbareVaults.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">Tresor hinzufügen</p>
+                <div className="space-y-1 max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                  {zuweisbareVaults.map((v: any) => (
+                    <div key={v.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50">
+                      <span className="text-sm text-gray-700">{v.name}</span>
+                      <button
+                        onClick={async () => {
+                          await gruppeVaultZuweisenAction(group.id, v.id, JSON.stringify({ use: true, reveal: false, edit: false, manage: false, export: false }));
+                          router.refresh();
+                        }}
+                        className="text-indigo-600 hover:text-indigo-800"
+                        title="Tresor zuweisen"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-4 rounded-lg">

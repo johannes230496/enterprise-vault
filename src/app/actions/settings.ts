@@ -101,6 +101,23 @@ export async function acceptInvitationAction(token: string, formData: FormData) 
   return { success: true };
 }
 
+export async function rolleAendernAction(userId: string, neueRolle: string) {
+  const session = await getSession();
+  if (!session?.user?.id) return { error: "Nicht authentifiziert" };
+
+  const actor = await prisma.user.findUnique({ where: { id: session.user.id as string } });
+  if (actor?.globalRole !== "OWNER") return { error: "Keine Berechtigung" };
+
+  const ziel = await prisma.user.findUnique({ where: { id: userId } });
+  if (!ziel || ziel.organizationId !== actor.organizationId) return { error: "Benutzer nicht gefunden" };
+  if (ziel.globalRole === "OWNER") return { error: "Eigentümer-Rolle kann nicht geändert werden" };
+  if (!["SECURITY_ADMIN", "MEMBER", "GUEST"].includes(neueRolle)) return { error: "Ungültige Rolle" };
+
+  await prisma.user.update({ where: { id: userId }, data: { globalRole: neueRolle } });
+  revalidatePath("/settings");
+  return { success: true };
+}
+
 export async function einladungErneuernAction(invitationId: string) {
   const session = await getSession();
   if (!session?.user?.id) return { error: "Nicht authentifiziert" };
@@ -125,4 +142,24 @@ export async function einladungErneuernAction(invitationId: string) {
 
   revalidatePath("/settings");
   return { success: true, token };
+}
+
+export async function sicherheitsrichtlinieAendernAction(feld: string, wert: boolean) {
+  const session = await getSession();
+  if (!session?.user?.id) return { error: "Nicht authentifiziert" };
+
+  const actor = await prisma.user.findUnique({ where: { id: session.user.id as string } });
+  if (actor?.globalRole !== "OWNER") return { error: "Keine Berechtigung" };
+
+  const erlaubt = ["enforce2FA", "preventExport", "auditAll"];
+  if (!erlaubt.includes(feld)) return { error: "Unbekanntes Feld" };
+
+  await prisma.orgSettings.upsert({
+    where: { organizationId: actor.organizationId as string },
+    update: { [feld]: wert },
+    create: { organizationId: actor.organizationId as string, [feld]: wert },
+  });
+
+  revalidatePath("/settings");
+  return { success: true };
 }

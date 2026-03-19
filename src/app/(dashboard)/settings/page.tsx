@@ -6,6 +6,8 @@ import { format } from "date-fns";
 import BenutzerEinladenModal from "@/components/settings/BenutzerEinladenModal";
 import BenutzerLoeschenButton from "@/components/settings/BenutzerLoeschenButton";
 import EinladungAktionen from "@/components/settings/EinladungAktionen";
+import RollenAendernDropdown from "@/components/settings/RollenAendernDropdown";
+import SicherheitsrichtlinieToggle from "@/components/settings/SicherheitsrichtlinieToggle";
 import { de } from "date-fns/locale";
 
 export default async function EinstellungenSeite() {
@@ -40,6 +42,10 @@ export default async function EinstellungenSeite() {
       expiresAt: { gt: new Date() },
     },
     orderBy: { createdAt: "desc" },
+  });
+
+  const orgSettings = await prisma.orgSettings.findUnique({
+    where: { organizationId: user.organizationId as string },
   });
 
   const rollenBeschriftungen: Record<string, { label: string; color: string }> = {
@@ -133,9 +139,13 @@ export default async function EinstellungenSeite() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${rolle.color}`}>
-                        {rolle.label}
-                      </span>
+                      {u.globalRole === "OWNER" || istIchSelbst ? (
+                        <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${rolle.color}`}>
+                          {rolle.label}
+                        </span>
+                      ) : (
+                        <RollenAendernDropdown userId={u.id} aktuelleRolle={u.globalRole} />
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
@@ -225,20 +235,11 @@ export default async function EinstellungenSeite() {
           <Shield className="w-5 h-5 text-gray-500 mr-2" />
           <h2 className="font-semibold text-gray-900">Sicherheitsrichtlinien</h2>
         </div>
-        <div className="px-6 py-5 space-y-4">
-          {[
-            { label: "Zwei-Faktor-Authentifizierung (2FA) erzwingen", aktiv: false },
-            { label: "Passwort-Export für Mitglieder verhindern", aktiv: true },
-            { label: "Audit-Protokoll für alle Zugriffe aktivieren", aktiv: true },
-            { label: "Automatischer Sitzungsablauf nach 8 Stunden", aktiv: true },
-          ].map((regel) => (
-            <div key={regel.label} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-              <span className="text-sm text-gray-700">{regel.label}</span>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${regel.aktiv ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-500"}`}>
-                {regel.aktiv ? "Aktiv" : "Inaktiv"}
-              </span>
-            </div>
-          ))}
+        <div className="px-6 py-5 divide-y divide-gray-100">
+          <SicherheitsrichtlinieToggle feld="enforce2FA" label="Zwei-Faktor-Authentifizierung (2FA) erzwingen" initialWert={orgSettings?.enforce2FA ?? false} />
+          <SicherheitsrichtlinieToggle feld="preventExport" label="Passwort-Export für Mitglieder verhindern" initialWert={orgSettings?.preventExport ?? true} />
+          <SicherheitsrichtlinieToggle feld="auditAll" label="Audit-Protokoll für alle Zugriffe aktivieren" initialWert={orgSettings?.auditAll ?? true} />
+          <SicherheitsrichtlinieToggle feld="sessionTimeout" label="Automatischer Sitzungsablauf nach 8 Stunden" initialWert={true} readonly={true} />
         </div>
       </section>
 

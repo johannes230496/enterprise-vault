@@ -47,11 +47,31 @@ export default async function AuditProtokollSeite({
     return "bg-gray-100 text-gray-800";
   };
 
-  const aktionsBeschriftungen: Record<string, string> = {
+  const aktionsLabel: Record<string, string> = {
     SECRET_REVEAL: "Geheimnis angezeigt",
     SECRET_CREATE: "Geheimnis erstellt",
+    SECRET_UPDATE: "Geheimnis bearbeitet",
     SECRET_DELETE: "Geheimnis gelöscht",
+    VAULT_CREATE: "Tresor erstellt",
+    VAULT_UPDATE: "Tresor bearbeitet",
+    VAULT_DELETE: "Tresor gelöscht",
     VAULT_MANAGE: "Tresor verwaltet",
+    GROUP_MANAGE: "Gruppe verwaltet",
+    USER_DELETE: "Benutzer gelöscht",
+    USER_INVITE: "Benutzer eingeladen",
+  };
+
+  const getKontextZusammenfassung = (metadata: string | null): string => {
+    if (!metadata) return "-";
+    try {
+      const obj = JSON.parse(metadata as string);
+      if (obj.name) return obj.name;
+      if (obj.action && obj.memberId) return `${obj.action} (${String(obj.memberId).substring(0, 8)}…)`;
+      const raw = JSON.stringify(obj);
+      return raw.length > 60 ? raw.substring(0, 60) + "…" : raw;
+    } catch {
+      return String(metadata).substring(0, 60);
+    }
   };
 
   return (
@@ -83,11 +103,10 @@ export default async function AuditProtokollSeite({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Zeitpunkt</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Benutzer</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktion</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ziel</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kontext</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px]">Zeitpunkt</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[160px]">Benutzer</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px]">Aktion</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Ziel</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -100,17 +119,17 @@ export default async function AuditProtokollSeite({
                     <div className="text-sm font-medium text-gray-900">{event.actor?.name || 'System'}</div>
                     <div className="text-sm text-gray-500">{event.actor?.email}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getAktionsfarbe(event.action)}`}>
-                      {aktionsBeschriftungen[event.action] || event.action}
+                      {aktionsLabel[event.action] ?? event.action}
                     </span>
+                    {event.metadata && (
+                      <div className="text-xs text-gray-400 mt-1">{getKontextZusammenfassung(event.metadata)}</div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="font-medium text-gray-900">{event.targetType}</div>
                     <div className="font-mono text-xs">{event.targetId.substring(0, 8)}...</div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 max-w-sm font-mono text-xs truncate">
-                    {event.metadata ? JSON.stringify(JSON.parse(event.metadata as string)) : "-"}
                   </td>
                 </tr>
               ))}
